@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "아파트너 로그인",
+        "description": "아파트너 계정 정보를 입력하세요",
+        "data": {
+          "apt_name": "아파트명 (통합구성요소 기기명)",
+          "id": "아이디",
+          "password": "비밀번호"
+        }
+      }
+    },
+    "error": {
+      "auth": "로그인 실패. 아이디와 비밀번호를 확인하세요.",
+      "invalid_auth": "로그인 실패. 아이디와 비밀번호를 확인하세요."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "아파트너 가변 설정",
+        "description": "데이터 수집 주기를 설정합니다. '예약 없을 시 대기 주기'는 당일 방문 차량이 없을 때, 서버 트래픽 차단을 막기 위해 시스템이 수면 상태를 유지하다가 한 번씩 깨어나서 데이터를 동기화하는 간격입니다.",
+        "data": {
+          "refresh_interval_seconds": "차량 입출차 확인 주기 (초)",
+          "idle_refresh_interval": "예약 없을 시 대기 주기 (초)",
+          "fee_refresh_hours": "관리비 확인 주기 (시간)",
+          "form_reset_minutes": "방문차량 예약 폼 초기화 (분)"
+        }
+      }
+    }
+  }
+}

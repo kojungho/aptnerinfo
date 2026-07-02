@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aptner Login",
+        "description": "Enter your Aptner account credentials",
+        "data": {
+          "apt_name": "Enter Apartment Name (Integration Device Name)",
+          "id": "User ID",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "auth": "Login failed. Please check your credentials.",
+      "invalid_auth": "Login failed. Please check your credentials."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Aptner Variable Settings",
+        "description": "Set data collection interval and expiration time manually.",
+        "data": {
+          "refresh_interval_seconds": "Vehicle entry/exit check interval (seconds)",
+          "idle_refresh_interval": "Idle refresh interval (seconds)",
+          "fee_refresh_hours": "Management fee check interval (hours)",
+          "form_reset_minutes": "Resets Visit Vehicle Reservation Form (minutes)"
+        }
+      }
+    }
+  }
+}
