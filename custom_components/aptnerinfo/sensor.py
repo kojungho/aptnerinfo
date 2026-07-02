@@ -97,7 +97,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         def data(self, value):
             self.data_reserve = value
 
-        # [핵심 교정] 스마트 절전 판단을 위해 당일 예약 내역이 존재하는지 먼저 훑어보는 함수
         def _has_today_reservation(self) -> bool:
             today = date.today()
             attrs = self.data_reserve.get("attrs", [])
@@ -168,7 +167,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
             except Exception:
                 pass
             
-            self.data_reserve = {"native": len(filtered_reserves), "attrs": filtered_reserves}
+            self.data_reserve = {"native": len(filtered_reserves), "attrs": filtered_reserves, "raw_root": res}
 
         async def update(self):
             if self._lock.locked(): return
@@ -176,7 +175,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 try:
                     now = datetime.now()
                     
-                    # [핵심 교정] 스마트 절전(Idle) 파이프라인 가동: 오늘 방문 예약이 없다면 10초 스케줄러가 부르더라도 서버 요청을 씹고(return) 잠에 듭니다.
                     has_today = self._has_today_reservation()
                     idle_interval = self.entry.options.get("idle_refresh_interval", 300)
 
@@ -184,9 +182,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
                         elapsed = (now - self._last_api_call_time).total_seconds()
                         if elapsed < idle_interval:
                             self.current_mode = f"스마트 절전 ({int(idle_interval)}초 주기 잠금 가동 중)"
-                            return # 여기서 함수를 탈출하여 서버 트래픽(429)을 극적으로 절약함
+                            return
 
-                    # 통과된 경우 (당일 예약이 있거나, 300초가 만료되었거나, 버튼 클릭 강제 호출 시)
                     if has_today:
                         self.current_mode = "실시간 감시 (당일 예약 포착 - 인터벌 주기 가동)"
                     else:
@@ -232,6 +229,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     hass.data[DOMAIN][entry.entry_id]["coordinators"] = {"fee": fc, "car": chc, "reserve": chc, "contact": cc}
 
+    # [교정 완료] 잡다한 보조 센서들을 전면 숙청하고 딱 1개의 핵심 주차 센서만 연동 유지
     entities = [
         AptnerFeeSensor(fc, entry.entry_id, f"{entry.entry_id}_fee_original", apt_name),
         AptnerFeePeriodSensor(fc, entry.entry_id, f"{entry.entry_id}_fee_period", apt_name),
@@ -239,6 +237,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         AptnerFeeHistorySensor(fc, entry.entry_id, f"{entry.entry_id}_fee_history", apt_name),
         AptnerCarSensor(chc, entry.entry_id, f"{entry.entry_id}_car_original", apt_name),
         AptnerReserveSensor(chc, entry.entry_id, f"{entry.entry_id}_reserve_original", apt_name),
+        AptnerAvailableHouseholdLimitSensor(chc, entry.entry_id, f"{entry.entry_id}_available_household_limit", apt_name), # [유지 대상]
         AptnerFeeTimestampSensor(fc, entry.entry_id, f"{entry.entry_id}_fee_refresh_time", apt_name),
         AptnerCarTimestampSensor(chc, entry.entry_id, f"{entry.entry_id}_car_refresh_time", apt_name),
     ]
@@ -343,9 +342,9 @@ class AptnerFeeDongHoSensor(_BaseAptnerSensor):
     def native_value(self):
         fee = self.coordinator.data.get("fee", {})
         dong = fee.get("dong")
-        ho = fee.get("ho")
-        if dong and ho:
-            return f"{dong}동 {ho}호"
+        host = fee.get("ho")
+        if dong and host:
+            return f"{dong}동 {host}호"
         return "정보 없음"
 
     @property
@@ -540,6 +539,41 @@ class AptnerReserveSensor(_BaseAptnerSensor):
                 "예약번호": reserve_id
             }
         return attrs
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(identifiers={(DOMAIN, self._entry_id)}, name=f"{self._apt_name} 주차", manufacturer="Aptner Custom")
+
+
+# =====================================================================
+# [독립 수령 및 개명 완료] 세대 한도 수집 단일 파서 (이름 변경 반영)
+# =====================================================================
+class AptnerAvailableHouseholdLimitSensor(_BaseAptnerSensor):
+    # [교정] 직관성을 위해 요청하신 명칭으로 완벽하게 엔티티 이름 수정 적용
+    _attr_name = "방문차량 주차 남은시간"
+    _attr_icon = "mdi:clock-outline"
+    _attr_native_unit_of_measurement = "분"
+    _attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> int | None:
+        """추가 트래픽 발송 없이, 예약 동기화 시점에 받아둔 최상위 visitConfig 트리 노드를 안전하게 리딩"""
+        raw_root = getattr(self.coordinator, "data_reserve", {}).get("raw_root", {})
+        if not raw_root:
+            return None
+        return raw_root.get("visitConfig", {}).get("availableHouseHoldLimit")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        raw_root = getattr(self.coordinator, "data_reserve", {}).get("raw_root", {})
+        config = raw_root.get("visitConfig", {})
+        return {
+            "주차_예약_세대_한도_시간": config.get("availableLimitText", "정보 없음"),
+            "최대_예약_가능_일수": config.get("parkingReserveHouseholdLimit", "정보 없음"),
+            "동일_차량_월간_제한_일수": config.get("parkingReserveCarLimit", "정보 없음"),
+            "예약_가능_시작시간": config.get("visitReserveStartTime", "정보 없음"),
+            "예약_가능_종료시간": config.get("visitReserveEndTime", "정보 없음")
+        }
 
     @property
     def device_info(self) -> DeviceInfo:
