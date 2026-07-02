@@ -1,0 +1,6 @@
+{
+  "name": "아파트너 정보 (Aptner Info)",
+  "homeassistant": "2024.1.0",
+  "render_readme": true,
+  "hacs": "1.34.0"
+}
