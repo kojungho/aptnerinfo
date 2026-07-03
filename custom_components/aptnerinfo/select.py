@@ -24,7 +24,7 @@ class AptnerReserveSelectPurpose(SelectEntity):
         self._ctx = ctx
         self._apt_name = apt_name
         self._attr_unique_id = f"{entry_id}_purpose_select"
-        self._attr_options = ["지인/가족방문", "기타"]
+        self._attr_options = ["지인/가족방문", "기타", "과외/수업", "돌봄도우미(청소)"]
         self._current_option: str | None = "기타"
 
     async def async_added_to_hass(self):
