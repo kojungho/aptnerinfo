@@ -69,7 +69,7 @@ class AptnerOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="아파트너 가변 설정", data=user_input)
 
         options = self._config_entry.options
-        refresh_interval = options.get("refresh_interval_seconds", 15)
+        refresh_interval = options.get("refresh_interval_seconds", 30)
         idle_interval = options.get("idle_refresh_interval", 300)
         fee_hours = options.get("fee_refresh_hours", 24)
         reset_minutes = options.get("form_reset_minutes", 5)
@@ -77,13 +77,13 @@ class AptnerOptionsFlowHandler(config_entries.OptionsFlow):
         # [교정] 개별 제어 스위치 엔티티 신설에 따라 컴팩트한 오리지널 주정차 스케줄 팩만 연동 유지
         data_schema = vol.Schema({
             vol.Required("refresh_interval_seconds", default=refresh_interval): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=600, mode=selector.NumberSelectorMode.BOX)
+                selector.NumberSelectorConfig(min=30, max=600, mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required("idle_refresh_interval", default=idle_interval): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=3600, mode=selector.NumberSelectorMode.BOX)
+                selector.NumberSelectorConfig(min=300, max=3600, mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required("fee_refresh_hours", default=fee_hours): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=24, mode=selector.NumberSelectorMode.BOX)
+                selector.NumberSelectorConfig(min=24, max=720, mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Required("form_reset_minutes", default=reset_minutes): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=60, mode=selector.NumberSelectorMode.BOX)
