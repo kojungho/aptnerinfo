@@ -20,12 +20,12 @@
     "step": {
       "init": {
         "title": "Aptner Variable Settings",
-        "description": "Set data collection interval and expiration time manually.",
+        "description": "Set data collection interval and expiration time manually.\n\n[Form Reset Switch Guide]\n\n■ Reset Visit Form Switch\n- ON : Instantly clears input fields upon successful reservation\n- OFF : Making multiple continuous entries with same data (Reset = 0)\n\n■ Reset Preset Form Switch\n- ON : Restarts preset booking dates to today upon completion\n- OFF : Reserving multiple preset slots for the same period (Reset = 0)",
         "data": {
           "refresh_interval_seconds": "Vehicle entry/exit check interval (seconds)",
           "idle_refresh_interval": "Idle refresh interval (seconds)",
           "fee_refresh_hours": "Management fee check interval (hours)",
-          "form_reset_minutes": "Resets Visit Vehicle Reservation Form (minutes)"
+          "form_reset_minutes": "Time-based Form Reset Timer (minutes)"
         }
       }
     }
