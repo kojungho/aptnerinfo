@@ -71,7 +71,7 @@ class AptnerOptionsFlowHandler(config_entries.OptionsFlow):
         options = self._config_entry.options
         refresh_interval = options.get("refresh_interval_seconds", 15)
         idle_interval = options.get("idle_refresh_interval", 300)
-        fee_hours = options.get("fee_refresh_hours", 12)
+        fee_hours = options.get("fee_refresh_hours", 24)
         reset_minutes = options.get("form_reset_minutes", 5)
         
         # [교정] 개별 제어 스위치 엔티티 신설에 따라 컴팩트한 오리지널 주정차 스케줄 팩만 연동 유지
