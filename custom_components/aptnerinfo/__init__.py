@@ -17,7 +17,6 @@ from .const import DOMAIN, CONF_ID, CONF_PASSWORD
 
 _LOGGER = logging.getLogger(__name__)
 
-# [교정] Platform.SWITCH를 추가하여 switch.py가 주차 기기 장치와 완벽하게 결합되도록 선언합니다.
 PLATFORMS: list[Platform] = [
     Platform.SENSOR, 
     Platform.SELECT, 
@@ -38,13 +37,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     user_id = entry.data.get(CONF_ID)
     password = entry.data.get(CONF_PASSWORD)
     
-    # [핵심 교정] 단기 독립 세션 생성으로 인한 커넥터 누수를 원천 차단하기 위해 코어 전역 세션 확보 및 주입
     session = async_get_clientsession(hass)
     entry_data["auth"] = AptnerAuth(user_id, password, session)
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # [가변 옵션 연동 부착]
     refresh_seconds = entry.options.get("refresh_interval_seconds", 10)
     fee_hours = entry.options.get("fee_refresh_hours", 12)
     fee_seconds_threshold = fee_hours * 3600
@@ -70,7 +67,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 except Exception as e:
                     _LOGGER.error(f"관리비 계열 백그라운드 데이터 갱신 실패 ({name}): {e}")
                     
-        # 12시간 주기 루프 시 아파트 연락처 데이터도 유기적으로 1번 동시 동기화
         contact_coord = coordinators.get("contact")
         if contact_coord:
             try:
@@ -83,7 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 entity.async_write_ha_state()
 
     # =====================================================================
-    # [태스크 B] 차량 실시간 조회 및 폼 그룹별 '독립' 자동 초기화 루프
+    # [태스크 B] 차량 실시간 조회 및 자정 경과 / 폼 타이머 자동 초기화 루프
     # =====================================================================
     async def _async_car_and_timer_refresh_loop(now):
         coordinators = hass.data[DOMAIN].get(entry.entry_id, {}).get("coordinators", {})
@@ -93,12 +89,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             try:
                 await reserve_coord.update()
                 
-                # 1. 센서 갱신
                 for entity in hass.data[DOMAIN].get("sensor_entities", []):
                     if hasattr(entity, "async_write_ha_state"):
                         entity.async_write_ha_state()
                         
-                # 2. 외부 데이터 변동 포착 시 실시간 UI 브로드캐스트 발포
                 for btn in hass.data[DOMAIN].get("del_btn_array", []):
                     try:
                         if hasattr(btn, "async_write_ha_state"): btn.async_write_ha_state()
@@ -124,28 +118,44 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         preset_end_obj = date_entities.get(f"{entry.entry_id}_preset_end")
         
         current_time = time.time()
-        
-        # [독립 분리 교정] 1. 일반 예약 폼 감시 그룹
+        today = datetime.date.today()
+
+        # =====================================================================
+        # [핵심 교정 패치] 자정 경과 실시간 감시 및 강제 당일 동기화 가드
+        # =====================================================================
+        # 사용자의 폼 조작이나 5분 타이머 만료 여부와 무관하게, 자정이 지나 시스템 날짜와 
+        # UI 달력창 엔티티의 실제 내부 값이 불일치하는 순간 즉시 당일 날짜로 연동 갱신합니다.
+        if start_obj and getattr(start_obj, "native_value", None) != today:
+            _LOGGER.info("자정 경과 포착: 일반 방문 시작일을 당일 날짜로 자동 보정합니다.")
+            await start_obj.async_set_value(today)
+        if end_obj and getattr(end_obj, "native_value", None) != today:
+            await end_obj.async_set_value(today)
+            
+        if preset_start_obj and getattr(preset_start_obj, "native_value", None) != today:
+            _LOGGER.info("자정 경과 포착: 프리셋 방문 시작일을 당일 날짜로 자동 보정합니다.")
+            await preset_start_obj.async_set_value(today)
+        if preset_end_obj and getattr(preset_end_obj, "native_value", None) != today:
+            await preset_end_obj.async_set_value(today)
+
+        # 1. 일반 예약 폼 만료 조건 판단
         general_objects = [carno_obj, phone_obj, start_obj, end_obj]
         general_should_reset = False
-        if reset_minutes > 0: # [방어 코드] 초기화 시간이 0분일 경우 영구유지 모드로 타이머 미작동
+        if reset_minutes > 0:
             for obj in general_objects:
                 if obj and hasattr(obj, "last_changed_time") and obj.last_changed_time is not None:
                     if current_time - obj.last_changed_time >= reset_seconds_threshold:
                         general_should_reset = True
                         break
 
-        # [독립 분리 교정] 2. 프리셋 날짜 감시 그룹
+        # 2. 프리셋 날짜 만료 조건 판단
         preset_objects = [preset_start_obj, preset_end_obj]
         preset_should_reset = False
-        if reset_minutes > 0: # [방어 코드] 초기화 시간이 0분일 경우 영구유지 모드로 타이머 미작동
+        if reset_minutes > 0:
             for obj in preset_objects:
                 if obj and hasattr(obj, "last_changed_time") and obj.last_changed_time is not None:
                     if current_time - obj.last_changed_time >= reset_seconds_threshold:
                         preset_should_reset = True
                         break
-
-        today = datetime.date.today()
 
         # --- A. 일반 폼 초기화 독립 실행 ---
         if general_should_reset:
@@ -175,11 +185,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             for obj in preset_objects:
                 if obj and hasattr(obj, "last_changed_time"): obj.last_changed_time = None
 
-    # 기존 가상 타이머 메모리 언로드
     if "fee_unsub" in entry_data and entry_data["fee_unsub"]: entry_data["fee_unsub"]()
     if "car_unsub" in entry_data and entry_data["car_unsub"]: entry_data["car_unsub"]()
 
-    # 가변 옵션 시간 할당으로 삼원화 파라미터 작동 안착
     entry_data["fee_unsub"] = async_track_time_interval(hass, _async_maintenance_fee_refresh_loop, timedelta(seconds=fee_seconds_threshold))
     entry_data["car_unsub"] = async_track_time_interval(hass, _async_car_and_timer_refresh_loop, timedelta(seconds=refresh_seconds))
 
