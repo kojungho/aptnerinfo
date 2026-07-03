@@ -16,7 +16,16 @@ from .aptner_auth import AptnerAuth
 from .const import DOMAIN, CONF_ID, CONF_PASSWORD
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SELECT, Platform.DATE, Platform.TEXT, Platform.BUTTON]
+
+# [교정] Platform.SWITCH를 추가하여 switch.py가 주차 기기 장치와 완벽하게 결합되도록 선언합니다.
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR, 
+    Platform.SELECT, 
+    Platform.DATE, 
+    Platform.TEXT, 
+    Platform.BUTTON,
+    Platform.SWITCH
+]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """통합구성요소 진입점에서 완벽한 양식 전체 자동 초기화 삼원 스케줄러를 가동합니다."""
