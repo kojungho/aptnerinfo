@@ -54,9 +54,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         fee_hours, refresh_seconds, reset_minutes
     )
 
-    # =====================================================================
-    # [태스크 A] 관리비 및 연락처 데이터 전용 가변 스케줄러 루프
-    # =====================================================================
     async def _async_maintenance_fee_refresh_loop(now):
         coordinators = hass.data[DOMAIN].get(entry.entry_id, {}).get("coordinators", {})
         
@@ -78,9 +75,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if hasattr(entity, "async_write_ha_state") and not str(entity.entity_id).endswith("reserve"):
                 entity.async_write_ha_state()
 
-    # =====================================================================
-    # [태스크 B] 차량 실시간 조회 및 자정 경과 / 폼 타이머 자동 초기화 루프
-    # =====================================================================
     async def _async_car_and_timer_refresh_loop(now):
         coordinators = hass.data[DOMAIN].get(entry.entry_id, {}).get("coordinators", {})
         reserve_coord = coordinators.get("reserve")
@@ -121,20 +115,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         today = datetime.date.today()
 
         # =====================================================================
-        # [핵심 교정 패치] 자정 경과 실시간 감시 및 강제 당일 동기화 가드
+        # [교정 완료] 자정 경과 시 '과거 날짜(어제)'만 선별하여 당일로 끌어올리는 방어 로직
         # =====================================================================
-        # 사용자의 폼 조작이나 5분 타이머 만료 여부와 무관하게, 자정이 지나 시스템 날짜와 
-        # UI 달력창 엔티티의 실제 내부 값이 불일치하는 순간 즉시 당일 날짜로 연동 갱신합니다.
-        if start_obj and getattr(start_obj, "native_value", None) != today:
-            _LOGGER.info("자정 경과 포착: 일반 방문 시작일을 당일 날짜로 자동 보정합니다.")
+        def _is_past_date(val):
+            if not val:
+                return False
+            try:
+                if isinstance(val, str):
+                    val = datetime.date.fromisoformat(val)
+                return val < today  # [핵심] '다르다(!=)'가 아니라 '작다(<)' 조건으로 미래 예약 가능 보장
+            except Exception:
+                return False
+
+        if start_obj and _is_past_date(getattr(start_obj, "native_value", None)):
+            _LOGGER.info("자정 경과 포착: UI 방문 시작일이 과거로 남아있어 당일 날짜로 보정합니다.")
             await start_obj.async_set_value(today)
-        if end_obj and getattr(end_obj, "native_value", None) != today:
+        if end_obj and _is_past_date(getattr(end_obj, "native_value", None)):
             await end_obj.async_set_value(today)
             
-        if preset_start_obj and getattr(preset_start_obj, "native_value", None) != today:
-            _LOGGER.info("자정 경과 포착: 프리셋 방문 시작일을 당일 날짜로 자동 보정합니다.")
+        if preset_start_obj and _is_past_date(getattr(preset_start_obj, "native_value", None)):
             await preset_start_obj.async_set_value(today)
-        if preset_end_obj and getattr(preset_end_obj, "native_value", None) != today:
+        if preset_end_obj and _is_past_date(getattr(preset_end_obj, "native_value", None)):
             await preset_end_obj.async_set_value(today)
 
         # 1. 일반 예약 폼 만료 조건 판단
