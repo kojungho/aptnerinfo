@@ -1,7 +1,7 @@
 {
   "domain": "aptnerinfo",
   "name": "아파트너 정보",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "documentation": "https://github.com/user/aptnerinfo",
   "dependencies": [],
   "codeowners": [],
