@@ -70,14 +70,11 @@ class AptnerOptionsFlowHandler(config_entries.OptionsFlow):
 
         options = self._config_entry.options
         refresh_interval = options.get("refresh_interval_seconds", 15)
-        
-        # [신설] 누락되었던 아이들(Idle) 절전 모드 변수 선언 (기본값 60초)
         idle_interval = options.get("idle_refresh_interval", 300)
-        
         fee_hours = options.get("fee_refresh_hours", 12)
         reset_minutes = options.get("form_reset_minutes", 5)
         
-        # [교정] UI 스키마에 idle_refresh_interval을 추가하고 요청하신 최소/최대값 1~60 할당
+        # [교정] 개별 제어 스위치 엔티티 신설에 따라 컴팩트한 오리지널 주정차 스케줄 팩만 연동 유지
         data_schema = vol.Schema({
             vol.Required("refresh_interval_seconds", default=refresh_interval): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=1, max=600, mode=selector.NumberSelectorMode.BOX)
