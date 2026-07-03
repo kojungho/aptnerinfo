@@ -115,7 +115,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         today = datetime.date.today()
 
         # =====================================================================
-        # [교정 완료] 자정 경과 시 '과거 날짜(어제)'만 선별하여 당일로 끌어올리는 방어 로직
+        # [과거 날짜 강제 진압 패치] 입력창에 과거 날짜 유입 시 실시간 강제 당일 복귀 보정 가드
         # =====================================================================
         def _is_past_date(val):
             if not val:
@@ -123,19 +123,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             try:
                 if isinstance(val, str):
                     val = datetime.date.fromisoformat(val)
-                return val < today  # [핵심] '다르다(!=)'가 아니라 '작다(<)' 조건으로 미래 예약 가능 보장
+                elif isinstance(val, datetime.datetime):
+                    val = val.date()
+                return val < today  # 오늘 날짜보다 무조건 작은(과거) 경우에만 트래킹 트리거 작동
             except Exception:
                 return False
 
+        # 자정이 지났을 때는 물론, 사용자가 직접 수동으로 달력에서 '과거 날짜'를 선택해 넣어도 실시간 인터벌 주기가 감지하여 즉시 오늘로 보정합니다.
         if start_obj and _is_past_date(getattr(start_obj, "native_value", None)):
-            _LOGGER.info("자정 경과 포착: UI 방문 시작일이 과거로 남아있어 당일 날짜로 보정합니다.")
+            _LOGGER.info("과거 날짜 유입 감지: 일반 방문 시작일을 당일 날짜로 보정 조치합니다.")
             await start_obj.async_set_value(today)
         if end_obj and _is_past_date(getattr(end_obj, "native_value", None)):
+            _LOGGER.info("과거 날짜 유입 감지: 일반 방문 종료일을 당일 날짜로 보정 조치합니다.")
             await end_obj.async_set_value(today)
             
         if preset_start_obj and _is_past_date(getattr(preset_start_obj, "native_value", None)):
+            _LOGGER.info("과거 날짜 유입 감지: 프리셋 시작일을 당일 날짜로 보정 조치합니다.")
             await preset_start_obj.async_set_value(today)
         if preset_end_obj and _is_past_date(getattr(preset_end_obj, "native_value", None)):
+            _LOGGER.info("과거 날짜 유입 감지: 프리셋 종료일을 당일 날짜로 보정 조치합니다.")
             await preset_end_obj.async_set_value(today)
 
         # 1. 일반 예약 폼 만료 조건 판단
