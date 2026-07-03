@@ -231,11 +231,11 @@ class AptnerReserveButton(ButtonEntity):
                     if hasattr(sensor, "async_write_ha_state"): sensor.async_write_ha_state()
                 except: pass
 
-        # [신설] ConfigEntry에서 사용자가 설정한 일반 폼 초기화 옵션값 불러오기
-        config_entry = self.hass.config_entries.async_get_entry(self._entry_id)
-        should_reset_visit = config_entry.options.get("reset_visit_form", True) if config_entry else True
+        # [교정] 기기 옵션 대신 새로 추가한 스위치 엔티티의 런타임 실시간 상태 리딩
+        entry_data = self.hass.data[DOMAIN].get(self._entry_id, {})
+        should_reset_visit = entry_data.get("switches", {}).get("reset_visit_form", True)
 
-        # [교정] 옵션이 ON(True)일 때만 하단 초기화 로직 실행
+        # 스위치가 켜져(True) 있을 때만 하단 초기화 로직 실행
         if should_reset_visit:
             await asyncio.sleep(0.5)
             if start_entity_obj: start_entity_obj.set_value_internal(date.today())
@@ -306,7 +306,7 @@ class AptnerDynamicPresetButton(ButtonEntity):
         start_date = preset_start_entity_obj.native_value if preset_start_entity_obj and preset_start_entity_obj.native_value else date.today()
         end_date = preset_end_entity_obj.native_value if preset_end_entity_obj and preset_end_entity_obj.native_value else date.today()
 
-        if end_date < start_date: raise HomeAssistantError("예약 종료일이 시작일보다 빠를 수 무 없습니다.")
+        if end_date < start_date: raise HomeAssistantError("예약 종료일이 시작일보다 빠를 수 없습니다.")
 
         raw_phone = info.get("phone", "")
         if not raw_phone:
@@ -355,11 +355,11 @@ class AptnerDynamicPresetButton(ButtonEntity):
                     if hasattr(sensor, "async_write_ha_state"): sensor.async_write_ha_state()
                 except: pass
 
-        # [신설] ConfigEntry에서 사용자가 설정한 프리셋 폼 초기화 옵션값 불러오기
-        config_entry = self.hass.config_entries.async_get_entry(self._entry_id)
-        should_reset_preset = config_entry.options.get("reset_preset_form", True) if config_entry else True
+        # [교정] 기기 옵션 대신 새로 추가한 스위치 엔티티의 런타임 실시간 상태 리딩
+        entry_data = self.hass.data[DOMAIN].get(self._entry_id, {})
+        should_reset_preset = entry_data.get("switches", {}).get("reset_preset_form", True)
 
-        # [교정] 옵션이 ON(True)일 때만 하단 프리셋 날짜 초기화 로직 실행
+        # 스위치가 켜져(True) 있을 때만 하단 프리셋 날짜 초기화 로직 실행
         if should_reset_preset:
             await asyncio.sleep(0.5)
             if preset_start_entity_obj: preset_start_entity_obj.set_value_internal(date.today())
