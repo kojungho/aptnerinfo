@@ -12,7 +12,9 @@ from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN, CONF_APT_NAME
 
 _LOGGER = logging.getLogger(__name__)
-CARNO_PATTERN = re.compile(r"^(?:\d{2}|\d{3})[가-힣]\d{4}$")
+
+# [교정 완료] 맨 앞에 2글자 지역명(서울, 경북 등)이 들어올 수도 있고, 안 들어올 수도 있도록 정규식 유연화 방어막 적용
+CARNO_PATTERN = re.compile(r"^(?:[가-힣]{2})?(?:\d{2}|\d{3})[가-힣]\d{4}$")
 PHONE_DIGIT_PATTERN = re.compile(r"\d+")
 
 DEFAULT_PRESETS_TEXT = "홍길동-123가4567-01012345678; 김미영-12호1004-01011112222;"
@@ -135,7 +137,7 @@ class AptnerCarPresetsMaster(TextEntity, RestoreEntity):
 class AptnerReserveCarNo(_BaseReserveText):
     def __init__(self, entry_id: str, ctx: dict, apt_name: str):
         super().__init__(entry_id, ctx, apt_name, key="carno", name="예약 차량번호 입력", max_len=16)
-        self._attr_placeholder = "12가3456 또는 123가4567"
+        self._attr_placeholder = "12가3456 또는 서울123가4567"
 
     async def async_set_value(self, value: str) -> None:
         v = (value or "").strip()
@@ -144,9 +146,14 @@ class AptnerReserveCarNo(_BaseReserveText):
             self.last_changed_time = None
             self.async_write_ha_state()
             return
+        
+        # [교정 완료] 사용자가 띄어쓰기나 하이픈을 넣더라도 여기서 모두 압축 제거하여 붙임 문장으로 만듭니다.
         clean_v = v.replace(" ", "").replace("-", "")
+        
+        # 압축된 차량번호가 유효한 형식(지역명 유무 포함)인지 검사합니다.
         if clean_v and not CARNO_PATTERN.match(clean_v):
-            raise ValueError("차량번호 형식이 맞지 않습니다.")
+            raise ValueError("차량번호 형식이 맞지 않습니다. (예: 서울12가3456 또는 123가4567)")
+            
         self._value = clean_v
         self.last_changed_time = time.time()
         self.async_write_ha_state()
